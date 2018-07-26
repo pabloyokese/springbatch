@@ -4,6 +4,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.partition.support.Partitioner;
 import org.springframework.batch.item.support.ClassifierCompositeItemProcessor;
@@ -12,9 +13,11 @@ import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.batch.item.xml.StaxEventItemReader;
 import org.springframework.batch.item.xml.StaxEventItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.oxm.xstream.XStreamMarshaller;
 
@@ -34,7 +37,7 @@ public class JobConfiguration {
 
     @Bean
     public ListItemReader<Good> itemReader() {
-        int inicialCapacity = 100000;
+        int inicialCapacity = 10;
         List<Good> items = new ArrayList<>(inicialCapacity);
         for (int i = 1; i <= inicialCapacity; i++) {
             items.add(new Good(Long.valueOf(i),"b","location good "+i));
@@ -48,12 +51,15 @@ public class JobConfiguration {
     }
 
     @Bean
-    public StaxEventItemWriter<Good> goodItemWriter() throws Exception {
+    @StepScope
+    public StaxEventItemWriter<Good> goodItemWriter(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
+                                                    @Value("#{stepExecutionContext[minValue]}") Integer minValue) throws Exception {
+        String fileName = minValue + "-" + maxValue;
+        System.out.println(fileName);
         XStreamMarshaller marshaller = new XStreamMarshaller();
         Map<String, Class> aliases = new HashMap<>();
         aliases.put("good", Good.class);
         marshaller.setAliases(aliases);
-
         StaxEventItemWriter<Good> itemWriter = new StaxEventItemWriter<>();
         itemWriter.setRootTagName("goods");
         itemWriter.setMarshaller(marshaller);
@@ -61,7 +67,7 @@ public class JobConfiguration {
 //////        /Users/pablo/IdeaProjects/batchexample
 ////        File file = new File("/Users/pablo/IdeaProjects/batchexample/good.xml");
 ////        System.out.println(">> Output path:"  + goodOutputPath);
-        itemWriter.setResource(new FileSystemResource("src/main/resources/good.xml"));
+        itemWriter.setResource(new FileSystemResource("src/main/resources/"+fileName+".xml"));
         itemWriter.afterPropertiesSet();
         return itemWriter;
     }
@@ -76,7 +82,7 @@ public class JobConfiguration {
     @Bean
     public RangePartitioner partitioner(){
         RangePartitioner partitioner = new RangePartitioner();
-        partitioner.setMax(100000);
+        partitioner.setMax(10);
         partitioner.setMin(1);
         return partitioner;
     }
@@ -99,9 +105,10 @@ public class JobConfiguration {
     @Bean
     public Step slaveStep() throws Exception {
         return stepBuilderFactory.get("slaveStep")
-                .<Good,Good>chunk(1000)
+                .<Good,Good>chunk(2)
                 .reader(itemReader())
-                .writer(goodItemWriter())
+                .writer(goodItemWriter(null,null))
+//                .writer(itemWriter())
                 .build();
     }
 

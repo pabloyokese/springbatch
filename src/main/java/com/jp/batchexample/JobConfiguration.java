@@ -7,6 +7,10 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.partition.support.Partitioner;
+import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
+import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
+import org.springframework.batch.item.file.transform.LineAggregator;
 import org.springframework.batch.item.support.ClassifierCompositeItemProcessor;
 import org.springframework.batch.item.support.ClassifierCompositeItemWriter;
 import org.springframework.batch.item.support.ListItemReader;
@@ -63,12 +67,31 @@ public class JobConfiguration {
         StaxEventItemWriter<Good> itemWriter = new StaxEventItemWriter<>();
         itemWriter.setRootTagName("goods");
         itemWriter.setMarshaller(marshaller);
-//        String goodOutputPath = File.createTempFile("goods",".xml").getAbsolutePath();
-//////        /Users/pablo/IdeaProjects/batchexample
-////        File file = new File("/Users/pablo/IdeaProjects/batchexample/good.xml");
-////        System.out.println(">> Output path:"  + goodOutputPath);
         itemWriter.setResource(new FileSystemResource("src/main/resources/"+fileName+".xml"));
         itemWriter.afterPropertiesSet();
+        return itemWriter;
+    }
+
+    @Bean
+    @StepScope
+    public FlatFileItemWriter<Good> flatFileItemWriter(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
+                                                       @Value("#{stepExecutionContext[minValue]}") Integer minValue) throws Exception {
+        String fileName = minValue + "-" + maxValue;
+        System.out.println(fileName);
+        System.out.println(Thread.currentThread().getName());
+
+        FlatFileItemWriter itemWriter = new FlatFileItemWriter();
+        itemWriter.setAppendAllowed(false);
+        DelimitedLineAggregator agregator = new DelimitedLineAggregator();
+        BeanWrapperFieldExtractor<Good> wrapper= new BeanWrapperFieldExtractor<>();
+        agregator.setDelimiter(",");
+        wrapper.setNames(new String[]{"id","goodMaster","location"});
+        agregator.setFieldExtractor(wrapper);
+
+        itemWriter.setLineAggregator(agregator);
+
+        itemWriter.setResource(new FileSystemResource("src/main/resources/"+fileName+".txt"));
+
         return itemWriter;
     }
 
@@ -107,7 +130,7 @@ public class JobConfiguration {
         return stepBuilderFactory.get("slaveStep")
                 .<Good,Good>chunk(2)
                 .reader(itemReader())
-                .writer(goodItemWriter(null,null))
+                .writer(flatFileItemWriter(null,null))
 //                .writer(itemWriter())
                 .build();
     }

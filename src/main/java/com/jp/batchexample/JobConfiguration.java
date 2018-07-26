@@ -56,6 +56,16 @@ public class JobConfiguration {
 
     @Bean
     @StepScope
+    SysOutItemWriter itemWriter2(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
+                                 @Value("#{stepExecutionContext[minValue]}") Integer minValue) {
+        String fileName = minValue + "-" + maxValue;
+        System.out.println(fileName);
+        return new SysOutItemWriter();
+    }
+
+
+    @Bean
+    @StepScope
     public StaxEventItemWriter<Good> goodItemWriter(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
                                                     @Value("#{stepExecutionContext[minValue]}") Integer minValue) throws Exception {
         String fileName = minValue + "-" + maxValue;
@@ -130,7 +140,7 @@ public class JobConfiguration {
         return stepBuilderFactory.get("slaveStep")
                 .<Good,Good>chunk(2)
                 .reader(itemReader())
-                .writer(flatFileItemWriter(null,null))
+                .writer(itemWriter2(null,null))
 //                .writer(itemWriter())
                 .build();
     }

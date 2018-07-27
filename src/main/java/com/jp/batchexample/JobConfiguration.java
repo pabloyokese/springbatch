@@ -40,10 +40,16 @@ public class JobConfiguration {
     private StepBuilderFactory stepBuilderFactory;
 
     @Bean
-    public ListItemReader<Good> itemReader() {
-        int inicialCapacity = 10;
-        List<Good> items = new ArrayList<>(inicialCapacity);
-        for (int i = 1; i <= inicialCapacity; i++) {
+    @StepScope
+    public ListItemReader<Good> itemReader(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
+                                           @Value("#{stepExecutionContext[minValue]}") Integer minValue) {
+//        int inicialCapacity = 10;
+//        List<Good> items = new ArrayList<>(inicialCapacity);
+//        for (int i = 1; i <= inicialCapacity; i++) {
+//            items.add(new Good(Long.valueOf(i),"b","location good "+i));
+//        }
+        List<Good> items = new ArrayList<>();
+        for (int i = minValue; i <= maxValue; i++) {
             items.add(new Good(Long.valueOf(i),"b","location good "+i));
         }
         return new ListItemReader<>(items);
@@ -59,6 +65,7 @@ public class JobConfiguration {
     SysOutItemWriter itemWriter2(@Value("#{stepExecutionContext[maxValue]}") Integer maxValue,
                                  @Value("#{stepExecutionContext[minValue]}") Integer minValue) {
         String fileName = minValue + "-" + maxValue;
+        System.out.println(Thread.currentThread().getName());
         System.out.println(fileName);
         return new SysOutItemWriter();
     }
@@ -138,9 +145,9 @@ public class JobConfiguration {
     @Bean
     public Step slaveStep() throws Exception {
         return stepBuilderFactory.get("slaveStep")
-                .<Good,Good>chunk(2)
-                .reader(itemReader())
-                .writer(itemWriter2(null,null))
+                .<Good,Good>chunk(4)
+                .reader(itemReader(null,null))
+                .writer(goodItemWriter(null,null))
 //                .writer(itemWriter())
                 .build();
     }
